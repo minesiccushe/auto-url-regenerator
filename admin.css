@@ -1,0 +1,9 @@
+#aurg_options .tab_contents{
+    display:none;
+}
+#aurg_options .tab_contents.tab_contents-active{
+    display:block;
+}
+#aurg_options .row_interval.disable {
+    display: none;
+}
