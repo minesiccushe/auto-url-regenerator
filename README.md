@@ -1,9 +1,9 @@
 === Auto URL Regenerator ===
 Contributors: Iccushe
-Tags: plugin,post,page,attachment,url,automatically,
+Tags: plugin,post,page,attachment,url,automatically,rewrite_rules
 Requires at least: 4.8
 Tested up to: 5.4.1
-Stable tag: 0.5.0
+Stable tag: 0.5.5
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Requires PHP: 7.0
@@ -27,6 +27,11 @@ Auto URL Regenerator is a plugin that adds a unique identifier to the URL of a p
 
 
 == Changelog ==
+
+= 0.5.5=
+* 2020-05-20
+* add caution message.
+* bug fixed.
 
 = 0.5.0 =
 * 2020-05-18
