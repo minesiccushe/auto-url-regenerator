@@ -2,7 +2,7 @@
 /*
 Plugin Name: Auto URL Regenerator
 Description: 投稿のURLに一意の識別子を付与し、また定期的に識別子を自動で更新するプラグイン
-Version: 0.5.0
+Version: 0.5.5
 Author: Iccushe
 Text Domain autourlregenerator
 License: GPLv2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) || ! defined( 'WPINC' ) ) :
 endif;
 
 // Version of the plugin
-define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '0.5.0' );
+define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '0.5.5' );
 
 if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 	class Auto_URL_Regenerator
@@ -41,6 +41,11 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			{
 				add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 				add_filter( 'plugin_action_links', array( $this, 'plugin_action_links' ), 10, 2 );
+			}
+
+			if ($wp_rewrite->permalink_structure == '' || !self::is_include_postname())
+			{
+				add_action('admin_notices',array( $this, 'admin_notice_aurg_disable'));
 			}
 
 			if(self::get_aurg_enable() === '1' && $wp_rewrite->permalink_structure !== '' )
@@ -150,7 +155,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 
 			?>
 			<?php if(isset($_GET['setting']) ):?>
-			<div id="message" class="updated">
+			<div id="message" class="notice notice-success is-dismissible">
 				<p><?php echo $message;?></p>
 			</div>
 			<?php endif;?>
@@ -276,7 +281,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		}
 		
 
-		function plugin_action_links( $links, $file )
+		public function plugin_action_links( $links, $file )
 		{
 			if ( $file == 'auto-url-regenerator/' . basename(__FILE__) ) {
 				$settings_link = '<a href="options-general.php?page=aurg_options">' . '設定' . '</a>';
@@ -286,15 +291,32 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		}
 
 
+		public function admin_notice_aurg_disable()
+		{
+			$screen = get_current_screen();
+			if($screen->id == 'options-permalink'):
+			?>
+			<div class="notice notice-warning is-dismissible">
+				<p>【Auto URL Regenerator】パーマリンクが正しく設定されていないため。プラグインが正常に動作しない恐れがあります。共通設定に<strong>%postname%</strong>を含めた値を設定してください。</p>
+			</div>
+			<?php else: ?>
+			<div class="notice notice-warning is-dismissible">
+				<p>【Auto URL Regenerator】パーマリンクが正しく設定されていないため。プラグインが正常に動作しない恐れがあります。<a href="options-permalink.php">パーマリンク設定</a>を見直してください。</p>
+			</div>
+			<?php endif;
+
+		}
+
+
 		private function set_interval()
 		{
 			$aurg_post_type = self::get_aurg_post_type();
-			$timezone = get_option( 'timezone_string' );
-			$date = new DateTime();
-			$date->setTimezone(new DateTimeZone($timezone) );
 
 			foreach($aurg_post_type as $value){
 				$aurg_interval = self::get_aurg_interval($value);
+				$timezone = get_option( 'timezone_string' );
+				$date = new DateTime();
+				$date->setTimezone(new DateTimeZone($timezone) );
 				switch($aurg_interval['interval_kind']){
 					case 0:
 						$date->modify($aurg_interval['interval_hour'].'hour ago' );
@@ -327,7 +349,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 
 		public function add_rewrite_rules( $flush = FALSE )
 		{
-			if($flush === TRUE){
+			if($flush === TRUE || !self::is_include_postname()){
 				return flush_rewrite_rules();
 			}
 
@@ -335,40 +357,40 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			$post_type_list = self::get_post_type_list();
 			$aurg_post_type = self::get_aurg_post_type();
 
-			foreach($post_type_list['custom'] as $value){
-				if(in_array($value->name,$aurg_post_type) ){
-					add_rewrite_rule($value->name.'/(.+)-[0-9a-f]{8}/?$', 'index.php?post_type=' . $value->name . '&' . $value->name . '=$matches[1]', 'top' );
+			foreach ($post_type_list['custom'] as $value) {
+				if (in_array($value->name, $aurg_post_type)) {
+					add_rewrite_rule($value->name.'/(.+)-[0-9a-f]{8}/?$', 'index.php?post_type=' . $value->name . '&' . $value->name . '=$matches[1]', 'top');
 				}
 			}
 
-			foreach($post_type_list['default'] as $value){
-				if(in_array($value->name,$aurg_post_type) ){
-					switch ($value->name){
+			foreach ($post_type_list['default'] as $value) {
+				if (in_array($value->name, $aurg_post_type)) {
+					switch ($value->name) {
 						case 'post':
-							$regex = ltrim($wp_rewrite->permalink_structure,'/' );
+							$regex = ltrim($wp_rewrite->permalink_structure, '/');
 							$n = 0;
-							foreach($wp_rewrite->rewritecode as $key => $value){
-								if($value === '%postname%' ){
-									$regex = str_replace($value, $wp_rewrite->rewritereplace[$key].'-[0-9a-f]{8}',$regex);
+							foreach ($wp_rewrite->rewritecode as $key => $value) {
+								if ($value === '%postname%') {
+									$regex = str_replace($value, $wp_rewrite->rewritereplace[$key].'-[0-9a-f]{8}', $regex);
 									$n++;
 									$query[$n] = 'name=$matches['.$n.']';
-								}else{
+								} else {
 									$regex = str_replace($value, $wp_rewrite->rewritereplace[$key], $regex, $cnt);
-									if($cnt >= 1){
+									if ($cnt >= 1) {
 										$n++;
-										$query[$n] = str_replace( '%','',$value).'=$matches['.$n.']';
+										$query[$n] = str_replace('%', '', $value).'=$matches['.$n.']';
 									}
 								}
 							}
-							$regex = rtrim($regex,'/' ).'(?:/([0-9]+) )?/?$';
+							$regex = rtrim($regex, '/').'(?:/([0-9]+) )?/?$';
 							$n++;
 							$query[$n] = 'page=$matches['.$n.']';
-							$redirect .= 'index.php?'.implode( '&',$query);
-							add_rewrite_rule($regex, $redirect, 'top' );
+							$redirect .= 'index.php?'.implode('&', $query);
+							add_rewrite_rule($regex, $redirect, 'top');
 							break;
 						case 'page':
 						case 'attachment':
-							add_rewrite_rule( '(.+)-p[0-9a-f]{8}?$', 'index.php?pagename=$matches[1]', 'top' );	
+							add_rewrite_rule('(.+)-p[0-9a-f]{8}?$', 'index.php?pagename=$matches[1]', 'top');
 							break;
 					}
 				}
@@ -380,7 +402,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		public function get_post_link_to_support($permalink, \WP_Post $post, $leavename)
 		{
 			$aurg_post_type = self::get_aurg_post_type();
-			if (in_array( 'post',$aurg_post_type) && self::is_not_incomplete_post_type( $post ) && self::is_aurg_checkbox( $post ) ){
+			if (in_array( 'post',$aurg_post_type) && self::is_not_incomplete_post_type( $post ) && self::is_include_postname() && self::is_aurg_checkbox( $post ) ){
 				$identifier = $this->get_identifier( $post );
 				$permalink = str_replace($post->post_name,$post->post_name.'-'.$identifier,$permalink);
 			}
@@ -392,7 +414,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		{
 			$post = get_post($post_id);
 			$aurg_post_type = self::get_aurg_post_type();
-			if (in_array( 'page',$aurg_post_type) && self::is_not_incomplete_post_type( $post ) && self::is_aurg_checkbox( $post ) ){
+			if (in_array( 'page',$aurg_post_type) && self::is_not_incomplete_post_type( $post ) && self::is_include_postname() && self::is_aurg_checkbox( $post ) ){
 				$identifier = $this->get_identifier( $post );
 				$link = str_replace($post->post_name,$post->post_name.'-p'.$identifier,$link);
 			}
@@ -404,7 +426,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		{
 			$post = get_post($post_id);
 			$aurg_post_type = self::get_aurg_post_type();
-			if (in_array( 'attachment',$aurg_post_type) && self::is_aurg_checkbox( $post ) ){	
+			if (in_array( 'attachment',$aurg_post_type) && self::is_include_postname() && self::is_aurg_checkbox( $post ) ){	
 				$identifier = $this->get_identifier( $post );
 				$link = str_replace($post->post_name,$post->post_name.'-p'.$identifier,$link);
 			}
@@ -415,7 +437,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		public function get_post_type_link_to_support($post_link, \WP_Post $post, $leavename, $sample)
 		{
 			$aurg_post_type = self::get_aurg_post_type();
-			if (in_array($post->post_type,$aurg_post_type) && self::is_not_incomplete_post_type( $post ) && self::is_aurg_checkbox( $post ) ){
+			if (in_array($post->post_type,$aurg_post_type) && self::is_not_incomplete_post_type( $post ) && self::is_include_postname() && self::is_aurg_checkbox( $post ) ){
 				$identifier = $this->get_identifier( $post );
 				$post_link = str_replace($post->post_name,$post->post_name.'-'.$identifier,$post_link);
 			}
@@ -466,7 +488,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		{
 			global $post;
 			$aurg_post_type = self::get_aurg_post_type();
-			if( is_singular() && in_array( $post->post_type, $aurg_post_type ) && self::is_not_incomplete_post_type( $post ) ){
+			if( is_singular() && in_array( $post->post_type, $aurg_post_type ) && self::is_not_incomplete_post_type( $post ) && self::is_include_postname() ){
 				$http = is_ssl() ? 'https://' : 'http://';
 				$url = $http . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"];
 				$url = parse_url($url);
@@ -579,6 +601,11 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 				global $post;
 			}
 			return !in_array( get_post_status( $post ), array( 'draft', 'pending', 'auto-draft', 'future' ) );
+		}
+
+		private static function is_include_postname(){
+			global $wp_rewrite;
+			return strpos($wp_rewrite->permalink_structure, '%postname%');
 		}
 
 
