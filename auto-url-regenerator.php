@@ -2,7 +2,7 @@
 /*
 Plugin Name: Auto URL Regenerator
 Description: 投稿のURLに一意の識別子を付与し、また定期的に識別子を自動で更新するプラグイン
-Version: 0.5.5
+Version: 0.6.0
 Author: Iccushe
 Text Domain autourlregenerator
 License: GPLv2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) || ! defined( 'WPINC' ) ) :
 endif;
 
 // Version of the plugin
-define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '0.5.5' );
+define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '0.6.0' );
 
 if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 	class Auto_URL_Regenerator
@@ -111,7 +111,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 				}
 
 				if(is_array($_POST['aurg_post_type']) ){
-					self::$options['aurg_post_type'] = $_POST['aurg_post_type'];
+					self::$options['aurg_post_type'] = esc_html(wp_unslash( $_POST['aurg_post_type']));
 				}else{
 					self::$options['aurg_post_type'] = array();
 				}
@@ -121,11 +121,11 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 
 				foreach ($post_types as $value) {
 					self::$options['aurg_interval'][$value->name]= array(
-						'interval_kind' => $_POST[$value->name.'_interval_kind'],
-						'interval_hour' => $_POST[$value->name.'_interval_hour'],
-						'interval_week' => $_POST[$value->name.'_interval_week'],
-						'interval_day'  => $_POST[$value->name.'_interval_day'],
-						'interval_salt' => ($_POST[$value->name.'_interval_kind']==='3' ) ? hash_hmac( 'sha256', mt_rand(),$before_interval[$value->name.'_interval_kind']):$before_interval[$value->name]['interval_salt'],
+						'interval_kind' => esc_html( wp_unslash($_POST[$value->name.'_interval_kind']) ),
+						'interval_hour' => esc_html( wp_unslash($_POST[$value->name.'_interval_hour']) ),
+						'interval_week' => esc_html( wp_unslash($_POST[$value->name.'_interval_week']) ),
+						'interval_day'  => esc_html( wp_unslash($_POST[$value->name.'_interval_day']) ),
+						'interval_salt' => ($_POST[$value->name.'_interval_kind'] === '3' ) ? hash_hmac( 'sha256', mt_rand(),$before_interval[$value->name.'_interval_kind']):$before_interval[$value->name]['interval_salt'],
 					);
 				}
 
@@ -156,7 +156,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			?>
 			<?php if(isset($_GET['setting']) ):?>
 			<div id="message" class="notice notice-success is-dismissible">
-				<p><?php echo $message;?></p>
+				<p><?php echo esc_attr($message);?></p>
 			</div>
 			<?php endif;?>
 			<h1>Auto URL Regenerator</h1>
@@ -186,13 +186,13 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 										<?php if(!empty($post_type_list['default']) ):?>
 											<h3>通常投稿タイプ</h3>
 											<?php foreach($post_type_list['default'] as $value):?>
-												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo $value->name;?>" <?php echo (in_array($value->name,$aurg_post_type) )?'checked':'';?>><?php echo $value->label;?></label><br>
+												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo esc_attr($value->name);?>" <?php checked(in_array($value->name,$aurg_post_type),true);?>><?php echo esc_attr($value->label);?></label><br>
 											<?php endforeach;?>
 										<?php endif;?>
 											<?php if(!empty($post_type_list['custom']) ):?>
 											<h3>カスタム投稿タイプ</h3>
 											<?php foreach($post_type_list['custom'] as $value):?>
-												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo $value->name;?>" <?php echo (in_array($value->name,$aurg_post_type) )?'checked':'';?>><?php echo $value->label;?></label><br>
+												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo esc_attr($value->name);?>" <?php checked(in_array($value->name,$aurg_post_type),true );?>><?php echo esc_attr($value->label);?></label><br>
 											<?php endforeach;?>
 										<?php endif;?>
 									</td>
@@ -203,13 +203,13 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 					<div class="tab_contents" id="tab2">
 						<?php $post_types = array_merge($post_type_list['default'],$post_type_list['custom']);?>
 						<?php foreach($post_types as $value):?>
-						<h3><?php echo $value->label;?></h3>
+						<h3><?php echo esc_attr($value->label);?></h3>
 						<table class="form-table">
 						<tbody class="table_interval">
 							<tr class="row_interval row_interval_kind">
 								<th>更新頻度</th>
 								<td>
-									<select id="<?php echo $value->name?>_interval_kind" name="<?php echo $value->name?>_interval_kind">
+									<select id="<?php echo esc_attr($value->name.'_interval_kind')?>" name="<?php echo esc_attr($value->name.'_interval_kind');?>">
 										<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_kind'];?>
 										<option <?php selected($selected,0);?> value="0">毎日</option>
 										<option <?php selected($selected,1);?> value="1">毎週</option>
@@ -221,10 +221,10 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 							<tr class="row_interval row_interval_hour">
 								<th>更新時間</th>
 								<td>
-									<select id="<?php echo $value->name?>_interval_hour" name="<?php echo $value->name?>_interval_hour">
+									<select id="<?php echo esc_attr($value->name.'_interval_hour');?>" name="<?php echo esc_attr($value->name.'_interval_hour');?>">
 									<?php for($n=0;$n<=23;$n++):?>
 										<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_hour'];?>
-										<option <?php selected($selected,$n);?> value="<?php echo $n;?>"><?php echo $n;?>時</option>
+										<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_attr($n)?>時</option>
 									<?php endfor;?>
 									</select>
 								</td>
@@ -232,11 +232,11 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 							<tr class="row_interval row_interval_week">
 								<th>更新曜日</th>
 								<td>
-									<select id="<?php echo $value->name?>_interval_week" name="<?php echo $value->name?>_interval_week">
+									<select id="<?php echo esc_attr($value->name.'_interval_week');?>" name="<?php echo esc_attr($value->name.'_interval_week');?>">
 										<?php $dotw = self::$dotw?>
 										<?php for($n=0;$n<=6;$n++):?>
 											<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_week'];?>
-											<option <?php selected($selected,$n);?> value="<?php echo $n;?>"><?php echo $dotw[$n];?></option>
+											<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_attr($dotw[$n]);?></option>
 										<?php endfor;?>
 									</select>
 								</td>
@@ -244,10 +244,10 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 							<tr class="row_interval row_interval_day">
 								<th>更新日</th>
 								<td>
-									<select id="<?php echo $value->name?>_interval_day" name="<?php echo $value->name?>_interval_day">
+									<select id="<?php echo esc_attr($value->name.'_interval_day');?>" name="<?php echo esc_attr($value->name.'_interval_day');?>">
 									<?php for($n=1;$n<=28;$n++):?>
 										<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_day'];?>
-										<option <?php selected($selected,$n);?> value="<?php echo $n;?>"><?php echo $n;?>日</option>
+										<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_attr($n);?>日</option>
 									<?php endfor;?>
 									<option <?php selected($selected,99);?> value="99">月末</option>
 									</select>
@@ -470,8 +470,8 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			$checked = (self::is_aurg_checkbox( $post ) ) ? TRUE : FALSE;
 			?>
 				
-			<input type="radio" name="aurg_checkbox" value="0"<?php echo ($checked) ? ' checked="checked"' : '';?>>オン
-			<input type="radio" name="aurg_checkbox" value="1"<?php echo ($checked) ? '' : ' checked="checked"';?>>オフ
+			<input type="radio" name="aurg_checkbox" value="0"<?php echo esc_attr(($checked) ? ' checked="checked"' : '');?>>オン
+			<input type="radio" name="aurg_checkbox" value="1"<?php echo esc_attr(($checked) ? '' : ' checked="checked"');?>>オフ
 			<?php
 		}
 
@@ -479,7 +479,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		public function save_aurg_checkbox_fields( $post_id )
 		{
 			if(isset($_POST['aurg_checkbox']) ){
-				update_post_meta($post_id, 'aurg_checkbox', $_POST['aurg_checkbox'] );
+				update_post_meta($post_id, 'aurg_checkbox', esc_html( wp_unslash($_POST['aurg_checkbox']) ) );
 			}
 		}
 
