@@ -2,7 +2,7 @@
 /*
 Plugin Name: Auto URL Regenerator
 Description: 投稿のURLに一意の識別子を付与し、また定期的に識別子を自動で更新するプラグイン
-Version: 0.6.0
+Version: 0.6.5
 Author: Iccushe
 Text Domain autourlregenerator
 License: GPLv2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) || ! defined( 'WPINC' ) ) :
 endif;
 
 // Version of the plugin
-define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '0.6.0' );
+define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '0.6.5' );
 
 if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 	class Auto_URL_Regenerator
@@ -111,7 +111,9 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 				}
 
 				if(is_array($_POST['aurg_post_type']) ){
-					self::$options['aurg_post_type'] = esc_html(wp_unslash( $_POST['aurg_post_type']));
+					foreach($_POST['aurg_post_type'] as $value){
+						self::$options['aurg_post_type'][] = sanitize_text_field($value);
+					}
 				}else{
 					self::$options['aurg_post_type'] = array();
 				}
@@ -121,10 +123,10 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 
 				foreach ($post_types as $value) {
 					self::$options['aurg_interval'][$value->name]= array(
-						'interval_kind' => esc_html( wp_unslash($_POST[$value->name.'_interval_kind']) ),
-						'interval_hour' => esc_html( wp_unslash($_POST[$value->name.'_interval_hour']) ),
-						'interval_week' => esc_html( wp_unslash($_POST[$value->name.'_interval_week']) ),
-						'interval_day'  => esc_html( wp_unslash($_POST[$value->name.'_interval_day']) ),
+						'interval_kind' => sanitize_text_field( $_POST[$value->name.'_interval_kind'] ),
+						'interval_hour' => sanitize_text_field( $_POST[$value->name.'_interval_hour'] ),
+						'interval_week' => sanitize_text_field( $_POST[$value->name.'_interval_week'] ),
+						'interval_day'  => sanitize_text_field( $_POST[$value->name.'_interval_day'] ),
 						'interval_salt' => ($_POST[$value->name.'_interval_kind'] === '3' ) ? hash_hmac( 'sha256', mt_rand(),$before_interval[$value->name.'_interval_kind']):$before_interval[$value->name]['interval_salt'],
 					);
 				}
@@ -479,7 +481,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		public function save_aurg_checkbox_fields( $post_id )
 		{
 			if(isset($_POST['aurg_checkbox']) ){
-				update_post_meta($post_id, 'aurg_checkbox', esc_html( wp_unslash($_POST['aurg_checkbox']) ) );
+				update_post_meta($post_id, 'aurg_checkbox', sanitize_text_field($_POST['aurg_checkbox'] ) );
 			}
 		}
 
