@@ -36,20 +36,20 @@ Auto URL Regenerator is a plugin that adds a unique identifier to the URL of a p
 
 == Changelog ==
 
-= 1.0.0=
+= 1.0.0 =
 * 2020-05-27
 * Release WordPress Page.
 
-= 0.6.5=
+= 0.6.5 =
 * 2020-05-24
 * change sanitize processing.
 * bug fixed.
 
-= 0.6.0=
+= 0.6.0 =
 * 2020-05-22
 * add sanitaize,escape,validate processing.
 
-= 0.5.5=
+= 0.5.5 =
 * 2020-05-20
 * add caution message.
 * bug fixed.
