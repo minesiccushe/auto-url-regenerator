@@ -2,7 +2,7 @@
 /*
 Plugin Name: Auto URL Regenerator
 Description: 投稿のURLに一意の識別子を付与し、また定期的に識別子を自動で更新するプラグイン
-Version: 0.6.5
+Version: 1.0.0
 Author: Iccushe
 Text Domain autourlregenerator
 License: GPLv2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) || ! defined( 'WPINC' ) ) :
 endif;
 
 // Version of the plugin
-define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '0.6.5' );
+define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '1.0.0' );
 
 if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 	class Auto_URL_Regenerator
