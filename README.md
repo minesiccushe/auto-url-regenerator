@@ -1,4 +1,5 @@
 === Auto URL Regenerator ===
+
 Contributors: Iccushe
 Tags: plugin,post,page,attachment,url,automatically,rewrite_rules
 Requires at least: 4.8
