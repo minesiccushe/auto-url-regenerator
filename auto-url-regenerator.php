@@ -3,6 +3,7 @@
 Plugin Name: Auto URL Regenerator
 Description: A plugin that adds a unique identifier to post URLs and automatically updates them periodically.
 Version: 1.1.0
+Requires PHP: 7.4
 Author: Iccushe
 Text Domain: autourlregenerator
 License: GPLv2
