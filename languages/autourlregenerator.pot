@@ -1,0 +1,172 @@
+# Copyright (C) 2025 Iccushe
+# This file is distributed under the GPLv2.
+msgid ""
+msgstr ""
+"Project-Id-Version: Auto URL Regenerator 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/app\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2025-05-22T05:10:07+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: autourlregenerator\n"
+
+#. Plugin Name of the plugin
+#: auto-url-regenerator.php
+#: auto-url-regenerator.php:92
+#: auto-url-regenerator.php:184
+msgid "Auto URL Regenerator"
+msgstr ""
+
+#. Description of the plugin
+#: auto-url-regenerator.php
+msgid "A plugin that adds a unique identifier to post URLs and automatically updates them periodically."
+msgstr ""
+
+#. Author of the plugin
+#: auto-url-regenerator.php
+msgid "Iccushe"
+msgstr ""
+
+#: auto-url-regenerator.php:46
+msgid "Sunday"
+msgstr ""
+
+#: auto-url-regenerator.php:47
+msgid "Monday"
+msgstr ""
+
+#: auto-url-regenerator.php:48
+msgid "Tuesday"
+msgstr ""
+
+#: auto-url-regenerator.php:49
+msgid "Wednesday"
+msgstr ""
+
+#: auto-url-regenerator.php:50
+msgid "Thursday"
+msgstr ""
+
+#: auto-url-regenerator.php:51
+msgid "Friday"
+msgstr ""
+
+#: auto-url-regenerator.php:52
+msgid "Saturday"
+msgstr ""
+
+#: auto-url-regenerator.php:169
+msgid "Settings saved."
+msgstr ""
+
+#: auto-url-regenerator.php:189
+msgid "Basic Settings"
+msgstr ""
+
+#: auto-url-regenerator.php:190
+msgid "Interval Settings"
+msgstr ""
+
+#: auto-url-regenerator.php:197
+msgid "Enable Automatic Update"
+msgstr ""
+
+#: auto-url-regenerator.php:200
+msgid "Disable"
+msgstr ""
+
+#: auto-url-regenerator.php:201
+msgid "Enable"
+msgstr ""
+
+#: auto-url-regenerator.php:206
+msgid "Post Types to Update"
+msgstr ""
+
+#: auto-url-regenerator.php:209
+msgid "Default Post Types"
+msgstr ""
+
+#: auto-url-regenerator.php:215
+msgid "Custom Post Types"
+msgstr ""
+
+#: auto-url-regenerator.php:232
+msgid "Update Frequency"
+msgstr ""
+
+#: auto-url-regenerator.php:236
+msgid "Daily"
+msgstr ""
+
+#: auto-url-regenerator.php:237
+msgid "Weekly"
+msgstr ""
+
+#: auto-url-regenerator.php:238
+msgid "Monthly"
+msgstr ""
+
+#: auto-url-regenerator.php:239
+msgid "Once Only"
+msgstr ""
+
+#: auto-url-regenerator.php:244
+msgid "Update Time"
+msgstr ""
+
+#: auto-url-regenerator.php:249
+#, php-format
+msgid "%s o'clock"
+msgstr ""
+
+#: auto-url-regenerator.php:255
+msgid "Update Day of Week"
+msgstr ""
+
+#: auto-url-regenerator.php:267
+msgid "Update Day of Month"
+msgstr ""
+
+#: auto-url-regenerator.php:272
+#, php-format
+msgid "%sth"
+msgstr ""
+
+#: auto-url-regenerator.php:274
+msgid "End of month"
+msgstr ""
+
+#: auto-url-regenerator.php:284
+msgid "Save Settings"
+msgstr ""
+
+#: auto-url-regenerator.php:309
+msgid "Settings"
+msgstr ""
+
+#: auto-url-regenerator.php:325
+#, php-format
+msgid "【Auto URL Regenerator】Permalinks are not set correctly. The plugin may not work properly. Please include %s in your common settings."
+msgstr ""
+
+#: auto-url-regenerator.php:336
+#, php-format
+msgid "【Auto URL Regenerator】Permalinks are not set correctly. The plugin may not work properly. Please review your <a href=\"%s\">permalink settings</a>."
+msgstr ""
+
+#: auto-url-regenerator.php:498
+msgid "URL Automatic Update Setting"
+msgstr ""
+
+#: auto-url-regenerator.php:509
+msgid "On"
+msgstr ""
+
+#: auto-url-regenerator.php:510
+msgid "Off"
+msgstr ""

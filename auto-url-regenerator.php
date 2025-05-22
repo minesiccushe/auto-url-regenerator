@@ -1,10 +1,11 @@
 <?php
 /*
 Plugin Name: Auto URL Regenerator
-Description: 投稿のURLに一意の識別子を付与し、また定期的に識別子を自動で更新するプラグイン
-Version: 1.0.0
+Description: A plugin that adds a unique identifier to post URLs and automatically updates them periodically.
+Version: 1.1.0
+Requires PHP: 7.4
 Author: Iccushe
-Text Domain autourlregenerator
+Text Domain: autourlregenerator
 License: GPLv2
 */
 
@@ -12,17 +13,29 @@ if ( ! defined( 'ABSPATH' ) || ! defined( 'WPINC' ) ) :
 	exit;
 endif;
 
-// Version of the plugin
-define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '1.0.0' );
+// Plugin version.
+define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '1.1.0' );
+
+/**
+ * Load plugin textdomain.
+ *
+ * @since 1.0.0
+ */
+function aurg_load_textdomain() {
+	load_plugin_textdomain( 'autourlregenerator', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+}
+add_action( 'plugins_loaded', 'aurg_load_textdomain' );
 
 if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 	class Auto_URL_Regenerator
 	{
 		private static $default_post_type = array( 'post', 'page', 'attachment' );
 
-		private static $dotw = array( '日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日' );
+		private static $dotw = array();
 
 		private static $interval_week = array( 'sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat' );
+
+		private static $identifier;
 
 		private static $options;
 
@@ -32,9 +45,20 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		{
 			global $wp_rewrite;
 
+			self::$dotw = array(
+				__( 'Sunday', 'autourlregenerator' ),
+				__( 'Monday', 'autourlregenerator' ),
+				__( 'Tuesday', 'autourlregenerator' ),
+				__( 'Wednesday', 'autourlregenerator' ),
+				__( 'Thursday', 'autourlregenerator' ),
+				__( 'Friday', 'autourlregenerator' ),
+				__( 'Saturday', 'autourlregenerator' ),
+			);
+
 			register_deactivation_hook( __FILE__, array( $this, 'deactivation_hook' ) );
 			add_action( 'admin_enqueue_scripts', array( $this, 'aurg_register_scripts') );
 
+			self::$identifier = get_option( 'aurg_identifier' );
 			self::$options = get_option( 'aurg_options' );
 
 			if ( is_admin() )
@@ -69,7 +93,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 
 		public function admin_menu()
 		{
-			$options_hook = add_options_page( 'Auto URL Regenerator','Auto URL Regenerator','manage_options','aurg_options', '__return_NULL' );
+			$options_hook = add_options_page( __( 'Auto URL Regenerator', 'autourlregenerator' ), __( 'Auto URL Regenerator', 'autourlregenerator' ),'manage_options','aurg_options', '__return_NULL' );
 			if($options_hook)
 			{
 				add_action("load-{$options_hook}", array(__CLASS__,'admin_load_aurg_options' ) );
@@ -96,7 +120,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		}
 
 
-		public function admin_aurg_option_save($action)
+		public static function admin_aurg_option_save($action)
 		{
 			if ($action == 'save' ) {
 				
@@ -110,12 +134,11 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 					$flush = TRUE;
 				}
 
+				self::$options['aurg_post_type'] = array();
 				if(is_array($_POST['aurg_post_type']) ){
 					foreach($_POST['aurg_post_type'] as $value){
 						self::$options['aurg_post_type'][] = sanitize_text_field($value);
 					}
-				}else{
-					self::$options['aurg_post_type'] = array();
 				}
 
 				$post_types = get_post_types( array( 'public' => TRUE), 'object', 'and' );
@@ -146,7 +169,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			if(isset($_GET['setting']) ){
 				switch ($_GET['setting']) {
 					case 'saved':
-						$message = '設定を保存しました';
+						$message = __( 'Settings saved.', 'autourlregenerator' );
 						break;
 				}
 			}
@@ -158,43 +181,43 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			?>
 			<?php if(isset($_GET['setting']) ):?>
 			<div id="message" class="notice notice-success is-dismissible">
-				<p><?php echo esc_attr($message);?></p>
+				<p><?php echo esc_html($message);?></p>
 			</div>
 			<?php endif;?>
-			<h1>Auto URL Regenerator</h1>
+			<h1><?php _e( 'Auto URL Regenerator', 'autourlregenerator' ); ?></h1>
 			<form method="post" id="aurg_options">
 				<?php wp_nonce_field(self::NONCE_ACTION);?>
 				<input type="hidden" name="action" value="save">
 				<h2 class="nav-tab-wrapper">
-					<a href="#tab1" class="nav-tab nav-tab-active">基本設定</a>
-					<a href="#tab2" class="nav-tab">間隔設定</a>
+					<a href="#tab1" class="nav-tab nav-tab-active"><?php _e( 'Basic Settings', 'autourlregenerator' ); ?></a>
+					<a href="#tab2" class="nav-tab"><?php _e( 'Interval Settings', 'autourlregenerator' ); ?></a>
 				</h2>
 				<div class="tab_container">
 					<div class="tab_contents tab_contents-active" id="tab1">
 						<table class="form-table">
 							<tbody>
 								<tr>
-									<th>自動更新を動作させる</th>
+									<th><?php _e( 'Enable Automatic Update', 'autourlregenerator' ); ?></th>
 									<td>
 										<select id="aurg_enable" name="aurg_enable"> 
-											<option <?php selected($aurg_enable,'0' ); ?> value="0">無効にする</option>
-											<option <?php selected($aurg_enable,'1' ); ?> value="1">有効にする</option>
+											<option <?php selected($aurg_enable,'0' ); ?> value="0"><?php _e( 'Disable', 'autourlregenerator' ); ?></option>
+											<option <?php selected($aurg_enable,'1' ); ?> value="1"><?php _e( 'Enable', 'autourlregenerator' ); ?></option>
 										</select>
 									</td>
 								</tr>
 								<tr>
-									<th>動作させる投稿タイプ</th>
+									<th><?php _e( 'Post Types to Update', 'autourlregenerator' ); ?></th>
 									<td>
 										<?php if(!empty($post_type_list['default']) ):?>
-											<h3>通常投稿タイプ</h3>
+											<h3><?php _e( 'Default Post Types', 'autourlregenerator' ); ?></h3>
 											<?php foreach($post_type_list['default'] as $value):?>
-												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo esc_attr($value->name);?>" <?php checked(in_array($value->name,$aurg_post_type),true);?>><?php echo esc_attr($value->label);?></label><br>
+												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo esc_attr($value->name);?>" <?php checked(in_array($value->name,$aurg_post_type),true);?>><?php echo esc_html($value->label);?></label><br>
 											<?php endforeach;?>
 										<?php endif;?>
 											<?php if(!empty($post_type_list['custom']) ):?>
-											<h3>カスタム投稿タイプ</h3>
+											<h3><?php _e( 'Custom Post Types', 'autourlregenerator' ); ?></h3>
 											<?php foreach($post_type_list['custom'] as $value):?>
-												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo esc_attr($value->name);?>" <?php checked(in_array($value->name,$aurg_post_type),true );?>><?php echo esc_attr($value->label);?></label><br>
+												<label><input type="checkbox" name="aurg_post_type[]" value="<?php echo esc_attr($value->name);?>" <?php checked(in_array($value->name,$aurg_post_type),true );?>><?php echo esc_html($value->label);?></label><br>
 											<?php endforeach;?>
 										<?php endif;?>
 									</td>
@@ -203,55 +226,59 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 						</table>
 					</div>
 					<div class="tab_contents" id="tab2">
-						<?php $post_types = array_merge($post_type_list['default'],$post_type_list['custom']);?>
+						<?php
+							$default_types = isset($post_type_list['default']) && is_array($post_type_list['default']) ? $post_type_list['default'] : array();
+							$custom_types = isset($post_type_list['custom']) && is_array($post_type_list['custom']) ? $post_type_list['custom'] : array();
+							$post_types = array_merge($default_types, $custom_types);
+						?>
 						<?php foreach($post_types as $value):?>
-						<h3><?php echo esc_attr($value->label);?></h3>
+						<h3><?php echo esc_html($value->label);?></h3>
 						<table class="form-table">
 						<tbody class="table_interval">
 							<tr class="row_interval row_interval_kind">
-								<th>更新頻度</th>
+								<th><?php _e( 'Update Frequency', 'autourlregenerator' ); ?></th>
 								<td>
 									<select id="<?php echo esc_attr($value->name.'_interval_kind')?>" name="<?php echo esc_attr($value->name.'_interval_kind');?>">
 										<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_kind'];?>
-										<option <?php selected($selected,0);?> value="0">毎日</option>
-										<option <?php selected($selected,1);?> value="1">毎週</option>
-										<option <?php selected($selected,2);?> value="2">毎月</option>
-										<option <?php selected($selected,3);?> value="3">1度のみ</option>
+										<option <?php selected($selected,0);?> value="0"><?php _e( 'Daily', 'autourlregenerator' ); ?></option>
+										<option <?php selected($selected,1);?> value="1"><?php _e( 'Weekly', 'autourlregenerator' ); ?></option>
+										<option <?php selected($selected,2);?> value="2"><?php _e( 'Monthly', 'autourlregenerator' ); ?></option>
+										<option <?php selected($selected,3);?> value="3"><?php _e( 'Once Only', 'autourlregenerator' ); ?></option>
 									</select>
 								</td>
 							</tr>
 							<tr class="row_interval row_interval_hour">
-								<th>更新時間</th>
+								<th><?php _e( 'Update Time', 'autourlregenerator' ); ?></th>
 								<td>
 									<select id="<?php echo esc_attr($value->name.'_interval_hour');?>" name="<?php echo esc_attr($value->name.'_interval_hour');?>">
 									<?php for($n=0;$n<=23;$n++):?>
 										<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_hour'];?>
-										<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_attr($n)?>時</option>
+										<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_html(sprintf(__( '%s o\'clock', 'autourlregenerator' ), $n));?></option>
 									<?php endfor;?>
 									</select>
 								</td>
 							</tr>
 							<tr class="row_interval row_interval_week">
-								<th>更新曜日</th>
+								<th><?php _e( 'Update Day of Week', 'autourlregenerator' ); ?></th>
 								<td>
 									<select id="<?php echo esc_attr($value->name.'_interval_week');?>" name="<?php echo esc_attr($value->name.'_interval_week');?>">
 										<?php $dotw = self::$dotw?>
 										<?php for($n=0;$n<=6;$n++):?>
 											<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_week'];?>
-											<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_attr($dotw[$n]);?></option>
+											<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_html($dotw[$n]);?></option>
 										<?php endfor;?>
 									</select>
 								</td>
 							</tr>
 							<tr class="row_interval row_interval_day">
-								<th>更新日</th>
+								<th><?php _e( 'Update Day of Month', 'autourlregenerator' ); ?></th>
 								<td>
 									<select id="<?php echo esc_attr($value->name.'_interval_day');?>" name="<?php echo esc_attr($value->name.'_interval_day');?>">
 									<?php for($n=1;$n<=28;$n++):?>
 										<?php $selected = (empty($aurg_interval[$value->name]) )?'':$aurg_interval[$value->name]['interval_day'];?>
-										<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_attr($n);?>日</option>
+										<option <?php selected($selected,$n);?> value="<?php echo esc_attr($n);?>"><?php echo esc_html(sprintf(__( '%sth', 'autourlregenerator' ), $n));?></option>
 									<?php endfor;?>
-									<option <?php selected($selected,99);?> value="99">月末</option>
+									<option <?php selected($selected,99);?> value="99"><?php _e( 'End of month', 'autourlregenerator' ); ?></option>
 									</select>
 								</td>
 							</tr>
@@ -261,7 +288,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 					</div>
 				</div>
 				<p class="submit">
-					<?php submit_button( '設定を保存', 'primary', NULL, FALSE); ?>
+					<?php submit_button( __( 'Save Settings', 'autourlregenerator' ), 'primary', NULL, FALSE); ?>
 					<span class="spinner"></span>
 				</p>
 			</form>
@@ -286,7 +313,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		public function plugin_action_links( $links, $file )
 		{
 			if ( $file == 'auto-url-regenerator/' . basename(__FILE__) ) {
-				$settings_link = '<a href="options-general.php?page=aurg_options">' . '設定' . '</a>';
+				$settings_link = '<a href="options-general.php?page=aurg_options">' . __( 'Settings', 'autourlregenerator' ) . '</a>';
 				$links = array_merge( array( $settings_link ), $links );
 			}
 			return $links;
@@ -299,11 +326,25 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			if($screen->id == 'options-permalink'):
 			?>
 			<div class="notice notice-warning is-dismissible">
-				<p>【Auto URL Regenerator】パーマリンクが正しく設定されていないため。プラグインが正常に動作しない恐れがあります。共通設定に<strong>%postname%</strong>を含めた値を設定してください。</p>
+				<p><?php 
+					echo wp_kses_post( 
+						sprintf( 
+							__( '【Auto URL Regenerator】Permalinks are not set correctly. The plugin may not work properly. Please include %s in your common settings.', 'autourlregenerator' ), 
+							'<strong>%postname%</strong>' 
+						) 
+					); 
+				?></p>
 			</div>
 			<?php else: ?>
 			<div class="notice notice-warning is-dismissible">
-				<p>【Auto URL Regenerator】パーマリンクが正しく設定されていないため。プラグインが正常に動作しない恐れがあります。<a href="options-permalink.php">パーマリンク設定</a>を見直してください。</p>
+				<p><?php 
+					echo wp_kses_post( 
+						sprintf( 
+							__( '【Auto URL Regenerator】Permalinks are not set correctly. The plugin may not work properly. Please review your <a href="%s">permalink settings</a>.', 'autourlregenerator' ), 
+							admin_url( 'options-permalink.php' ) 
+						) 
+					); 
+				?></p>
 			</div>
 			<?php endif;
 
@@ -323,12 +364,12 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 					case 0:
 						$date->modify($aurg_interval['interval_hour'].'hour ago' );
 						$date->modify( 'today' );
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
 						break;
 					case 1:
 						$date->modify( 'tomorrow' );
 						$date->modify( 'last '.self::$interval_week[$aurg_interval['interval_week']]);
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
 						break;
 					case 2:
 						$date->modify( 'tomorrow' );
@@ -338,18 +379,18 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 							$date->modify( 'last month' );
 						}
 						$date->modify( 'first day of last month' );
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
 						break;
 					case 3:
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256',$aurg_interval['interval_salt'], $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256',$aurg_interval['interval_salt'], $value);
 						break;
 				}
 			}
-			update_option( 'aurg_identifier', self::$options, FALSE);
+			update_option( 'aurg_identifier', self::$identifier, FALSE);
 		}
 		
 
-		public function add_rewrite_rules( $flush = FALSE )
+		public static function add_rewrite_rules( $flush = FALSE )
 		{
 			if($flush === TRUE || !self::is_include_postname()){
 				return flush_rewrite_rules();
@@ -452,7 +493,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			if($post == NULL){
 				global $post;
 			}
-			$aurg_identifier = self::get_aurg_identifier($post);
+			$aurg_identifier = self::get_aurg_identifier($post->post_type);
 			return mb_substr(hash_hmac( 'sha256', $post->post_name, $aurg_identifier), 0, 8);
 		}
 
@@ -461,7 +502,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		{
 			$aurg_post_type = self::get_aurg_post_type();
 			foreach ($aurg_post_type as $value) {
-				add_meta_box( 'aurg_checkbox', 'URL自動更新設定', array($this, 'insert_aurg_checkbox_field' ), $value, 'normal' );
+				add_meta_box( 'aurg_checkbox', __( 'URL Automatic Update Setting', 'autourlregenerator' ), array($this, 'insert_aurg_checkbox_field' ), $value, 'normal' );
 			}
 		}
 
@@ -472,8 +513,8 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			$checked = (self::is_aurg_checkbox( $post ) ) ? TRUE : FALSE;
 			?>
 				
-			<input type="radio" name="aurg_checkbox" value="0"<?php echo esc_attr(($checked) ? ' checked="checked"' : '');?>>オン
-			<input type="radio" name="aurg_checkbox" value="1"<?php echo esc_attr(($checked) ? '' : ' checked="checked"');?>>オフ
+			<input type="radio" name="aurg_checkbox" value="0"<?php echo esc_attr(($checked) ? ' checked="checked"' : '');?>><?php _e( 'On', 'autourlregenerator' ); ?>
+			<input type="radio" name="aurg_checkbox" value="1"<?php echo esc_attr(($checked) ? '' : ' checked="checked"');?>> <?php _e( 'Off', 'autourlregenerator' ); ?>
 			<?php
 		}
 
@@ -555,13 +596,10 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		}
 
 
-		private static function get_aurg_identifier( $post_type = NULL )
+		private static function get_aurg_identifier( $post_type )
 		{
-			if(!isset( $post_type ) ){
-				return ( isset(self::$options['aurg_identifier']) && self::$options['aurg_identifier'] ) ? self::$options['aurg_identifier'] : array();
-			}
-			$option = self::get_aurg_identifier();
-			foreach($option as $key => $value){
+			$identifier = self::$identifier['hash_values'];
+			foreach($identifier as $key => $value){
 				if($post_type === $key){
 					return $value;
 				}
@@ -625,7 +663,7 @@ function Auto_URL_Regenerator()
 	new Auto_URL_Regenerator();
 }
 
-/*
-* Initialize this plugin once all other plugins have finished loading.
-*/
+/**
+ * Initialize this plugin once all other plugins have finished loading.
+ */
 add_action( 'after_setup_theme', 'Auto_URL_Regenerator', 99);
