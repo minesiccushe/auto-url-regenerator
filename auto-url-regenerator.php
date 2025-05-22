@@ -2,7 +2,7 @@
 /*
 Plugin Name: Auto URL Regenerator
 Description: A plugin that adds a unique identifier to post URLs and automatically updates them periodically.
-Version: 1.0.0
+Version: 1.1.0
 Author: Iccushe
 Text Domain: autourlregenerator
 License: GPLv2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) || ! defined( 'WPINC' ) ) :
 endif;
 
 // Plugin version.
-define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '1.0.0' );
+define( 'AUTO_URL_REGENERATOR_CURRENT_VERSION', '1.1.0' );
 
 /**
  * Load plugin textdomain.
