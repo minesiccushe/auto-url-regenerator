@@ -596,11 +596,8 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		}
 
 
-		private static function get_aurg_identifier( $post_type = NULL )
+		private static function get_aurg_identifier( $post_type )
 		{
-			if(!isset( $post_type ) ){
-				return ( isset(self::$options['aurg_post_type']) && self::$options['aurg_post_type'] ) ? self::$options['aurg_post_type'] : array();
-			}
 			$identifier = self::$identifier['hash_values'];
 			foreach($identifier as $key => $value){
 				if($post_type === $key){
