@@ -35,6 +35,8 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 
 		private static $interval_week = array( 'sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat' );
 
+		private static $identifier;
+
 		private static $options;
 
 		const NONCE_ACTION = 'aurg_option_setting';
@@ -56,6 +58,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			register_deactivation_hook( __FILE__, array( $this, 'deactivation_hook' ) );
 			add_action( 'admin_enqueue_scripts', array( $this, 'aurg_register_scripts') );
 
+			self::$identifier = get_option( 'aurg_identifier' );
 			self::$options = get_option( 'aurg_options' );
 
 			if ( is_admin() )
@@ -131,12 +134,11 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 					$flush = TRUE;
 				}
 
+				self::$options['aurg_post_type'] = array();
 				if(is_array($_POST['aurg_post_type']) ){
 					foreach($_POST['aurg_post_type'] as $value){
 						self::$options['aurg_post_type'][] = sanitize_text_field($value);
 					}
-				}else{
-					self::$options['aurg_post_type'] = array();
 				}
 
 				$post_types = get_post_types( array( 'public' => TRUE), 'object', 'and' );
@@ -224,7 +226,11 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 						</table>
 					</div>
 					<div class="tab_contents" id="tab2">
-						<?php $post_types = array_merge($post_type_list['default'],$post_type_list['custom']);?>
+						<?php
+							$default_types = isset($post_type_list['default']) && is_array($post_type_list['default']) ? $post_type_list['default'] : array();
+							$custom_types = isset($post_type_list['custom']) && is_array($post_type_list['custom']) ? $post_type_list['custom'] : array();
+							$post_types = array_merge($default_types, $custom_types);
+						?>
 						<?php foreach($post_types as $value):?>
 						<h3><?php echo esc_html($value->label);?></h3>
 						<table class="form-table">
@@ -358,12 +364,12 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 					case 0:
 						$date->modify($aurg_interval['interval_hour'].'hour ago' );
 						$date->modify( 'today' );
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
 						break;
 					case 1:
 						$date->modify( 'tomorrow' );
 						$date->modify( 'last '.self::$interval_week[$aurg_interval['interval_week']]);
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
 						break;
 					case 2:
 						$date->modify( 'tomorrow' );
@@ -373,14 +379,14 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 							$date->modify( 'last month' );
 						}
 						$date->modify( 'first day of last month' );
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
 						break;
 					case 3:
-						self::$options['hash_values'][$value] = hash_hmac( 'sha256',$aurg_interval['interval_salt'], $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256',$aurg_interval['interval_salt'], $value);
 						break;
 				}
 			}
-			update_option( 'aurg_identifier', self::$options, FALSE);
+			update_option( 'aurg_identifier', self::$identifier, FALSE);
 		}
 		
 
@@ -487,7 +493,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			if($post == NULL){
 				global $post;
 			}
-			$aurg_identifier = self::get_aurg_identifier($post);
+			$aurg_identifier = self::get_aurg_identifier($post->post_type);
 			return mb_substr(hash_hmac( 'sha256', $post->post_name, $aurg_identifier), 0, 8);
 		}
 
@@ -593,10 +599,10 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		private static function get_aurg_identifier( $post_type = NULL )
 		{
 			if(!isset( $post_type ) ){
-				return ( isset(self::$options['aurg_identifier']) && self::$options['aurg_identifier'] ) ? self::$options['aurg_identifier'] : array();
+				return ( isset(self::$options['aurg_post_type']) && self::$options['aurg_post_type'] ) ? self::$options['aurg_post_type'] : array();
 			}
-			$option = self::get_aurg_identifier();
-			foreach($option as $key => $value){
+			$identifier = self::$identifier['hash_values'];
+			foreach($identifier as $key => $value){
 				if($post_type === $key){
 					return $value;
 				}
