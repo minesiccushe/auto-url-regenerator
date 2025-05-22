@@ -117,7 +117,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		}
 
 
-		public function admin_aurg_option_save($action)
+		public static function admin_aurg_option_save($action)
 		{
 			if ($action == 'save' ) {
 				
@@ -224,12 +224,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 						</table>
 					</div>
 					<div class="tab_contents" id="tab2">
-						<?php
-						// nullを空配列に変換してからarray_merge
-						$default_types = isset($post_type_list['default']) && is_array($post_type_list['default']) ? $post_type_list['default'] : array();
-						$custom_types = isset($post_type_list['custom']) && is_array($post_type_list['custom']) ? $post_type_list['custom'] : array();
-						$post_types = array_merge($default_types, $custom_types);
-						?>
+						<?php $post_types = array_merge($post_type_list['default'],$post_type_list['custom']);?>
 						<?php foreach($post_types as $value):?>
 						<h3><?php echo esc_html($value->label);?></h3>
 						<table class="form-table">
@@ -389,7 +384,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		}
 		
 
-		public function add_rewrite_rules( $flush = FALSE )
+		public static function add_rewrite_rules( $flush = FALSE )
 		{
 			if($flush === TRUE || !self::is_include_postname()){
 				return flush_rewrite_rules();
