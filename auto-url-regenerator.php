@@ -58,8 +58,21 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			register_deactivation_hook( __FILE__, array( $this, 'deactivation_hook' ) );
 			add_action( 'admin_enqueue_scripts', array( $this, 'aurg_register_scripts') );
 
-			self::$identifier = get_option( 'aurg_identifier' );
+			// Ensure options are initialized as arrays to prevent errors if options are not yet saved (e.g., new install)
+			// This is crucial for PHP 8+ where array access on null/false can cause fatal errors.
 			self::$options = get_option( 'aurg_options' );
+			if ( !is_array(self::$options) ) {
+				self::$options = array(); // Default to an empty array if 'aurg_options' is not set or not an array.
+			}
+
+			self::$identifier = get_option( 'aurg_identifier' );
+			// Ensure self::$identifier and its 'hash_values' sub-array exist and are arrays.
+			// 'hash_values' stores the generated identifiers for each post type.
+			if ( !is_array(self::$identifier) ) {
+				self::$identifier = array('hash_values' => array()); // Default structure if 'aurg_identifier' is not set.
+			} elseif ( !isset(self::$identifier['hash_values']) || !is_array(self::$identifier['hash_values']) ) {
+				self::$identifier['hash_values'] = array(); // Ensure 'hash_values' key exists and is an array.
+			}
 
 			if ( is_admin() )
 			{
@@ -142,15 +155,44 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 				}
 
 				$post_types = get_post_types( array( 'public' => TRUE), 'object', 'and' );
-				$before_interval = self::get_aurg_interval();
+				$before_interval = self::get_aurg_interval(); // Relies on self::$options being an array (guaranteed by constructor)
 
-				foreach ($post_types as $value) {
+				foreach ($post_types as $value) { // $value is WP_Post_Type object
+					// Provide defaults for POSTed interval values before sanitization.
+					// This ensures that even if form data is missing, we have valid fallback values.
+					$interval_kind_posted = isset($_POST[$value->name.'_interval_kind']) ? $_POST[$value->name.'_interval_kind'] : '0'; // Default 'Daily'
+					$interval_hour_posted = isset($_POST[$value->name.'_interval_hour']) ? $_POST[$value->name.'_interval_hour'] : '0'; // Default '0 o\'clock'
+					$interval_week_posted = isset($_POST[$value->name.'_interval_week']) ? $_POST[$value->name.'_interval_week'] : '0'; // Default 'Sunday'
+					$interval_day_posted  = isset($_POST[$value->name.'_interval_day'])  ? $_POST[$value->name.'_interval_day']  : '1'; // Default '1st day'
+
+					$interval_kind = sanitize_text_field( $interval_kind_posted );
+					$interval_hour = sanitize_text_field( $interval_hour_posted );
+					$interval_week = sanitize_text_field( $interval_week_posted );
+					$interval_day  = sanitize_text_field( $interval_day_posted );
+
+					$current_salt = '';
+					// Safely retrieve the current salt for this post type, if it exists from a previous save.
+					// This prevents errors if $before_interval or specific keys are not set.
+					if (is_array($before_interval) && isset($before_interval[$value->name]) && is_array($before_interval[$value->name]) && isset($before_interval[$value->name]['interval_salt'])) {
+						$current_salt = $before_interval[$value->name]['interval_salt'];
+					}
+
+					// Safely retrieve the old interval_kind value.
+					// This is used as the HMAC key for salt generation if interval_kind is '3' (Once Only).
+					// While using a dynamic value like the previous interval_kind as an HMAC key is unusual and not cryptographically strong,
+					// this preserves the original logic's intent of changing the salt if the "Once Only" option is re-selected after being something else.
+					$hmac_key_for_salt = '';
+					if (is_array($before_interval) && isset($before_interval[$value->name]) && is_array($before_interval[$value->name]) && isset($before_interval[$value->name]['interval_kind'])) {
+						$hmac_key_for_salt = (string) $before_interval[$value->name]['interval_kind'];
+					}
+					
 					self::$options['aurg_interval'][$value->name]= array(
-						'interval_kind' => sanitize_text_field( $_POST[$value->name.'_interval_kind'] ),
-						'interval_hour' => sanitize_text_field( $_POST[$value->name.'_interval_hour'] ),
-						'interval_week' => sanitize_text_field( $_POST[$value->name.'_interval_week'] ),
-						'interval_day'  => sanitize_text_field( $_POST[$value->name.'_interval_day'] ),
-						'interval_salt' => ($_POST[$value->name.'_interval_kind'] === '3' ) ? hash_hmac( 'sha256', mt_rand(),$before_interval[$value->name.'_interval_kind']):$before_interval[$value->name]['interval_salt'],
+						'interval_kind' => $interval_kind, // 0:Daily, 1:Weekly, 2:Monthly, 3:Once
+						'interval_hour' => $interval_hour, // 0-23
+						'interval_week' => $interval_week, // 0-6 (Sun-Sat)
+						'interval_day'  => $interval_day,  // 1-28, or 99 for end of month
+						// Generate new salt if 'Once Only' is selected; otherwise, keep the existing salt.
+						'interval_salt' => ($interval_kind === '3' ) ? hash_hmac( 'sha256', mt_rand(), $hmac_key_for_salt) : $current_salt,
 					);
 				}
 
@@ -372,16 +414,52 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
 						break;
 					case 2:
-						$date->modify( 'tomorrow' );
-						if($aurg_interval['interval_day'] < 29){
-							$date->modify($aurg_interval['interval_day'].'day ago' );
-						}else{
-							$date->modify( 'last month' );
+						// Monthly interval calculation revised:
+						// The $date variable holds the current datetime, adjusted by WordPress timezone.
+						// $reference_date_for_hash will be the actual date used for hash generation (set to 00:00:00 of the target day).
+						$reference_date_for_hash = new DateTime('now', new DateTimeZone($timezone));
+						$reference_date_for_hash->setTime(0,0,0); // Start with today at midnight as a base.
+
+						if ($aurg_interval['interval_day'] < 29) { // Case for a specific day of the month (1-28, as per UI).
+							$day_to_check = (int)$aurg_interval['interval_day'];
+							
+							// Initially, set reference_date_for_hash to the target day of the *current* month.
+							$reference_date_for_hash->setDate((int)$reference_date_for_hash->format('Y'), (int)$reference_date_for_hash->format('m'), $day_to_check);
+
+							// $target_trigger_timestamp is the precise moment (interval_hour on the target day) when the URL should change.
+							$target_trigger_timestamp = clone $reference_date_for_hash; // Cloned from target day at 00:00:00.
+							$target_trigger_timestamp->setTime((int)$aurg_interval['interval_hour'], 0, 0); // Set to the configured hour.
+
+							// If the current time ($date) is *before* this month's trigger point,
+							// the hash should be based on *last month's* target day.
+							if ($date < $target_trigger_timestamp) {
+								$reference_date_for_hash->modify('first day of last month'); // Go to the 1st of last month.
+								// Then set to the correct day_to_check for that previous month.
+								$reference_date_for_hash->setDate((int)$reference_date_for_hash->format('Y'), (int)$reference_date_for_hash->format('m'), $day_to_check);
+								$reference_date_for_hash->setTime(0,0,0); // Ensure it's at midnight.
+							}
+							// Otherwise, $reference_date_for_hash (current month's target day at 00:00:00) is correct.
+
+						} else { // Case for "End of month" (where interval_day is 99).
+							// Initially, set reference_date_for_hash to the end of the *current* month.
+							$reference_date_for_hash->modify('last day of this month');
+							$reference_date_for_hash->setTime(0,0,0); // Ensure it's at midnight.
+
+							$target_trigger_timestamp = clone $reference_date_for_hash; // Cloned from EOM at 00:00:00.
+							$target_trigger_timestamp->setTime((int)$aurg_interval['interval_hour'], 0, 0); // Set to the configured hour.
+
+							// If the current time ($date) is *before* this month's EOM trigger point,
+							// the hash should be based on *last month's* EOM.
+							if ($date < $target_trigger_timestamp) {
+								$reference_date_for_hash->modify('first day of last month'); // Go to 1st of prior month.
+								$reference_date_for_hash->modify('last day of this month');   // Then to end of that prior month.
+								$reference_date_for_hash->setTime(0,0,0); // Ensure it's at midnight.
+							}
+							// Otherwise, $reference_date_for_hash (current month's EOM at 00:00:00) is correct.
 						}
-						$date->modify( 'first day of last month' );
-						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $date->format(DateTime::ATOM), $value);
+						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256', $reference_date_for_hash->format(DateTime::ATOM), $value);
 						break;
-					case 3:
+					case 3: // "Once Only" interval
 						self::$identifier['hash_values'][$value] = hash_hmac( 'sha256',$aurg_interval['interval_salt'], $value);
 						break;
 				}
@@ -393,7 +471,8 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		public static function add_rewrite_rules( $flush = FALSE )
 		{
 			if($flush === TRUE || !self::is_include_postname()){
-				return flush_rewrite_rules();
+				flush_rewrite_rules();
+				return;
 			}
 
 			global $wp_rewrite;
@@ -410,30 +489,43 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 				if (in_array($value->name, $aurg_post_type)) {
 					switch ($value->name) {
 						case 'post':
+							$target_for_rule = ''; // Initialize target for the rule
+							$query = array();    // Initialize query array
 							$regex = ltrim($wp_rewrite->permalink_structure, '/');
 							$n = 0;
-							foreach ($wp_rewrite->rewritecode as $key => $value) {
-								if ($value === '%postname%') {
-									$regex = str_replace($value, $wp_rewrite->rewritereplace[$key].'-[0-9a-f]{8}', $regex);
+							// In the loop below, $value was shadowing outer loop's $value (post type object). Renamed to $code_tag.
+							foreach ($wp_rewrite->rewritecode as $code_key => $code_tag) {
+								if ($code_tag === '%postname%') {
+									$regex = str_replace($code_tag, $wp_rewrite->rewritereplace[$code_key].'-[0-9a-f]{8}', $regex);
 									$n++;
 									$query[$n] = 'name=$matches['.$n.']';
 								} else {
-									$regex = str_replace($value, $wp_rewrite->rewritereplace[$key], $regex, $cnt);
+									$regex = str_replace($code_tag, $wp_rewrite->rewritereplace[$code_key], $regex, $cnt);
 									if ($cnt >= 1) {
 										$n++;
-										$query[$n] = str_replace('%', '', $value).'=$matches['.$n.']';
+										$query_var = str_replace('%', '', $code_tag);
+										// Map common permalink tags to their query variables
+										if ($query_var === 'category') $query_var = 'category_name';
+										if ($query_var === 'tag') $query_var = 'tag';
+										// Add more mappings if other specific tags are commonly used
+										$query[$n] = $query_var.'=$matches['.$n.']';
 									}
 								}
 							}
-							$regex = rtrim($regex, '/').'(?:/([0-9]+) )?/?$';
+							$regex = rtrim($regex, '/').'(?:/([0-9]+) )?/?$'; // Append optional pagination
 							$n++;
-							$query[$n] = 'page=$matches['.$n.']';
-							$redirect .= 'index.php?'.implode('&', $query);
-							add_rewrite_rule($regex, $redirect, 'top');
+							$query[$n] = 'page=$matches['.$n.']'; // For paged content on single posts
+						// $target_for_rule is the query string WordPress will execute.
+						// $regex is the pattern to match in the requested URL.
+							$target_for_rule = 'index.php?'.implode('&', $query);
+							add_rewrite_rule($regex, $target_for_rule, 'top');
 							break;
 						case 'page':
 						case 'attachment':
-							add_rewrite_rule('(.+)-p[0-9a-f]{8}?$', 'index.php?pagename=$matches[1]', 'top');
+						// Rule for pages and attachments. Example: page-slug-pAbcdef12
+						// The '-p' prefix is specific to pages/attachments in this plugin.
+						// Corrected regex to use /?$ for an optional trailing slash.
+							add_rewrite_rule('(.+)-p[0-9a-f]{8}/?$', 'index.php?pagename=$matches[1]', 'top');
 							break;
 					}
 				}
@@ -493,8 +585,19 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			if($post == NULL){
 				global $post;
 			}
-			$aurg_identifier = self::get_aurg_identifier($post->post_type);
-			return mb_substr(hash_hmac( 'sha256', $post->post_name, $aurg_identifier), 0, 8);
+			$aurg_identifier = self::get_aurg_identifier($post->post_type); // This is the scheduled hash (daily, weekly, etc.)
+
+			if ( $aurg_identifier === FALSE ) {
+				// If the base scheduled identifier for the post type is missing (e.g., options not saved yet, or post type not configured),
+				// return an empty string. This prevents hash_hmac from using FALSE (which casts to an empty string) as a key.
+				// An empty identifier means the URL won't have the hashed part, e.g., 'post-slug-' or 'post-slug-p'.
+				return '';
+			}
+
+			// The final 8-char identifier is a hash of the post's name, keyed by the scheduled hash ($aurg_identifier).
+			// This makes the identifier unique per post and per regeneration interval.
+			// Using substr is slightly more direct for hex strings than mb_substr.
+			return substr(hash_hmac( 'sha256', $post->post_name, $aurg_identifier), 0, 8);
 		}
 
 
@@ -534,18 +637,32 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			if( is_singular() && in_array( $post->post_type, $aurg_post_type ) && self::is_not_incomplete_post_type( $post ) && self::is_include_postname() ){
 				$http = is_ssl() ? 'https://' : 'http://';
 				$url = $http . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"];
-				$url = parse_url($url);
-				if(self::is_aurg_checkbox( $post ) ){
-					$identifier = $this->get_identifier( $post );
-					if(!strpos( $url['path'], $identifier ) ){
-						$url = self::get_redirect_correct_url( $post );
-						wp_redirect( $url, 301 );
-						exit;
+				$current_url_parsed = parse_url($url);
+				$current_path = $current_url_parsed['path']; // The path part of the currently requested URL.
+
+				if(self::is_aurg_checkbox( $post ) ){ // URL regeneration is ON for this specific post (via post meta).
+					$identifier = $this->get_identifier( $post ); // Expected 8-char identifier for this post.
+					
+					// Only attempt to enforce identifier presence if a valid (non-empty) identifier is expected.
+					// If $identifier is empty (e.g., due to missing base aurg_identifier for the post type),
+					// we cannot enforce its presence, as this would lead to redirect loops.
+					if ( !empty($identifier) ) {
+						// If the current URL path does not contain the expected identifier.
+						if(strpos( $current_path, $identifier ) === false ){ 
+							// Generate the correct URL (which will include the identifier via hooked filters).
+							$target_url = self::get_redirect_correct_url( $post ); 
+							wp_redirect( $target_url, 301 );
+							exit;
+						}
 					}
-				}else{
-					if(preg_match("/\/(.+)-p?[0-9a-f]{8}/", $url['path']) ){
-						$url = self::get_redirect_correct_url( $post );
-						wp_redirect( $url, 301 );
+				}else{ // URL regeneration is OFF for this specific post.
+					// If regeneration is off, but the URL contains an old identifier pattern,
+					// redirect to the canonical URL (without the identifier).
+					// The regex matches '-<8_hex_chars>' or '-p<8_hex_chars>'.
+					if(preg_match("/\/(.+)-p?[0-9a-f]{8}/", $current_path) ){
+						// Generate the correct URL (which will NOT include the identifier).
+						$target_url = self::get_redirect_correct_url( $post ); 
+						wp_redirect( $target_url, 301 );
 						exit;
 					}
 				}
