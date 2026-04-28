@@ -511,6 +511,7 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 		{
 			global $post;
 			$checked = (self::is_aurg_checkbox( $post ) ) ? TRUE : FALSE;
+			wp_nonce_field( 'aurg_save_post_meta', 'aurg_nonce' );
 			?>
 				
 			<input type="radio" name="aurg_checkbox" value="0"<?php echo esc_attr(($checked) ? ' checked="checked"' : '');?>><?php _e( 'On', 'autourlregenerator' ); ?>
@@ -521,6 +522,26 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 
 		public function save_aurg_checkbox_fields( $post_id )
 		{
+			// Check if nonce is set.
+			if ( ! isset( $_POST['aurg_nonce'] ) ) {
+				return;
+			}
+
+			// Verify that the nonce is valid.
+			if ( ! wp_verify_nonce( $_POST['aurg_nonce'], 'aurg_save_post_meta' ) ) {
+				return;
+			}
+
+			// If this is an autosave, our form has not been submitted, so we don't want to do anything.
+			if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+				return;
+			}
+
+			// Check the user's permissions.
+			if ( ! current_user_can( 'edit_post', $post_id ) ) {
+				return;
+			}
+
 			if(isset($_POST['aurg_checkbox']) ){
 				update_post_meta($post_id, 'aurg_checkbox', sanitize_text_field($_POST['aurg_checkbox'] ) );
 			}
