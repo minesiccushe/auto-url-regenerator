@@ -631,7 +631,8 @@ if ( !class_exists( 'Auto_URL_Regenerator' ) ) :
 			if($post == NULL){
 				global $post;
 			}
-			return ( empty( get_post_meta( $post->ID, 'aurg_checkbox', TRUE ) ) || get_post_meta( $post->ID, 'aurg_checkbox', TRUE ) === "0" );
+			$aurg_checkbox = get_post_meta( $post->ID, 'aurg_checkbox', TRUE );
+			return ( empty( $aurg_checkbox ) || $aurg_checkbox === "0" );
 		}
 
 
