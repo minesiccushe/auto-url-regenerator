@@ -8,7 +8,7 @@ jQuery(document).ready(function($) {
         $(this).addClass(navClassName);
         tabContents.removeClass(tabClassName).eq(index).addClass(tabClassName);
     });
-    $('.row_interval_kind').each( function(index, element){
+    $('.row_interval_kind').each( function(){
         var className = 'disable';
         var kind_val = $(this).find('select').val();
         $(this).parent().find('tr.row_interval').addClass(className).eq(+kind_val+1).removeClass(className);
